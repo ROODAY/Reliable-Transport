@@ -1,2 +1,2 @@
-# Reliable-Transport
-Implementing a reliable transport protocl in Java
+# Reliable Transport
+Implementing a reliable transport protocol in Java
