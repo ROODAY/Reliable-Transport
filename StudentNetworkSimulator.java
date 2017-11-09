@@ -106,6 +106,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
 
     // B
     private int lastRcvSeqNum = -1;
+    private int expectedSeqNum = 0;
     private Packet[] receiverWindow;
     private Packet lastRcvPacket;
 
@@ -141,6 +142,16 @@ public class StudentNetworkSimulator extends NetworkSimulator {
       return chk;
     }
 
+    private boolean isInWindow(int start, int seqno) {
+      for (int i = 0; i < WindowSize; i++) {
+        if (start % LimitSeqNo == seqno) {
+          return true;
+        } else {
+          start++;
+        }
+      }
+      return false;
+    }
     
     // This routine will be called whenever the upper layer at the sender [A]
     // has a message to send.  It is the job of your protocol to insure that
@@ -148,17 +159,19 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     // the receiving upper layer.
     protected void aOutput(Message message) {
       //System.out.println("A Ouput: Begin");
-
       // Create and buffer packet
       Packet aPacket = new Packet(CurSeqNo, -1, 0, message.getData());
       aPacket.setChecksum(checksum(aPacket));
       senderBuffer.add(aPacket);
-      CurSeqNo++;
 
+
+      System.out.printf("OUT LOOP: sendHead: %d, CurSeqNo: %d\n", sendHead, CurSeqNo);
       // Add from buffer into window where space allows
       for (int i = sendHead; i < sendHead + WindowSize && i < senderBuffer.size(); i++) {
-        if (senderWindow[i % WindowSize] == null) {
-          senderWindow[i % WindowSize] = senderBuffer.get(i);
+        System.out.printf("IN LOOP: sendHead: %d, i: %d, CurSeqNo: %d\n", sendHead, i, CurSeqNo);
+        if (isInWindow(sendHead, i) && senderWindow[i % WindowSize] == null) {
+          ackStatus[i % WindowSize] = -1;
+          senderWindow[i % WindowSize] = senderBuffer.poll();
         }
       }
 
@@ -172,6 +185,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
           startTimer(A, RxmtInterval);
         }
       }
+      CurSeqNo = (CurSeqNo + 1) % LimitSeqNo;
 
       //System.out.println("A Output: End");
     }
@@ -181,49 +195,52 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     // arrives at the A-side.  "packet" is the (possibly corrupted) packet
     // sent from the B-side.
     protected void aInput(Packet packet) {
+      // Check if packet is corrupt
       if (packet.getChecksum() == checksum(packet)) {
+        stopTimer(A);
 
-        // If new ack, stop timer and update ack status
-        if (ackStatus[packet.getAcknum() % WindowSize] == 0) {
-          stopTimer(A);
-          ackStatus[packet.getAcknum() % WindowSize] = 1;
+        // Check if ack is in window
+        if (isInWindow(sendHead, packet.getAcknum())) {
+          System.out.println("Received ack for: " + packet.getAcknum());
+          // Check if at head
+          if (packet.getAcknum() == sendHead) {
+            ackStatus[sendHead] = -1;
+            senderWindow[sendHead] = null;
+            sendHead = (sendHead + 1) % WindowSize;
 
-          // If ack is head or greater, update head
-          if (packet.getAcknum() >= sendHead) {
-            int oldHead = sendHead;
-            sendHead = packet.getAcknum() + 1;
-
-            // Slide window up then transmit new data packets from buffer
-            for (int i = oldHead; i < sendHead; i++) {
-              ackStatus[i % WindowSize] = -1;
-              senderWindow[i % WindowSize] = null;
+          // Loop till at head
+          } else {
+            while (sendHead != packet.getAcknum()) {
+              ackStatus[sendHead] = -1;
+              senderWindow[sendHead] = null;
+              sendHead = (sendHead + 1) % WindowSize;
             }
-
-            // Add from buffer into window where space allows
-            for (int i = sendHead; i < sendHead + WindowSize && i < senderBuffer.size(); i++) {
-              if (senderWindow[i % WindowSize] == null) {
-                senderWindow[i % WindowSize] = senderBuffer.get(i);
-              }
-            }
-
-            // For every packet in window, check if unsent. If so, send 
-            for (int i = 0; i < ackStatus.length; i ++) {
-              if (senderWindow[i] != null && ackStatus[i] == -1) {
-                ackStatus[i] = 0;
-                toLayer3(A, senderWindow[i]);
-                originalTransmissions++;
-                stopTimer(A);
-                startTimer(A, RxmtInterval);
-              }
-            }
-
           }
-        // If duplicate ack, resend next packet
-        } else if (ackStatus[packet.getAcknum() % WindowSize] == 1) {
-          toLayer3(A, senderWindow[(packet.getAcknum() + 1) % WindowSize]);
-          retransmissions++;
-          stopTimer(A);
-          startTimer(A, RxmtInterval);
+
+          // Add from buffer into window where space allows
+          for (int i = sendHead; i < sendHead + WindowSize && i < senderBuffer.size(); i++) {
+            if (isInWindow(sendHead, i) &&  senderWindow[i % WindowSize] == null) {
+              senderWindow[i % WindowSize] = senderBuffer.poll();
+            }
+          }
+
+          // For every packet in window, check if unsent. If so, send 
+          for (int i = 0; i < ackStatus.length; i ++) {
+            if (senderWindow[i] != null && ackStatus[i] == -1) {
+              ackStatus[i] = 0;
+              toLayer3(A, senderWindow[i]);
+              originalTransmissions++;
+              stopTimer(A);
+              startTimer(A, RxmtInterval);
+            }
+          }
+
+        // Packet not in window
+        } else {
+          if (senderWindow[sendHead] != null) {
+            toLayer3(A, senderWindow[sendHead]);
+            retransmissions++;
+          }
         }
       } else {
         System.out.println("A Input: Received Corrupted Packet");
@@ -241,14 +258,10 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     protected void aTimerInterrupt() {
       //System.out.println("A Timer Interrupt: Begin");
 
-      for (int i = sendHead; i < sendHead + WindowSize; i++) {
-        if (ackStatus[i % WindowSize] == 0) {
-          toLayer3(A, senderWindow[i % WindowSize]);
-          retransmissions++;
-          stopTimer(A);
-          startTimer(A, RxmtInterval);
-        } 
-      }
+      toLayer3(A, senderWindow[sendHead]);
+      retransmissions++;
+      stopTimer(A);
+      startTimer(A, RxmtInterval);
 
       //System.out.println("A Timer Interrupt: End");
     }
@@ -275,39 +288,45 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         packet.setAcknum(packet.getSeqnum());
         packet.setChecksum(checksum(packet));
 
-        // If packet is expected seq num, send data up to layer 5
-        if (packet.getSeqnum() == (lastRcvSeqNum + 1)) {
-          toLayer5(packet.getPayload());
-          toLayer3(B, packet);
-          ackedPackets++;
-          deliveredPackets++;
-          lastRcvSeqNum++;
-          lastRcvPacket = packet;
+        // If packet is in window
+        if (isInWindow(expectedSeqNum, packet.getSeqnum())) {
+          // If packet is expected
+          if (packet.getSeqnum() == expectedSeqNum) {
 
-          // Check buffer for more packets
-          while (receiverWindow[(lastRcvSeqNum + 1) % WindowSize] != null && receiverWindow[(lastRcvSeqNum + 1) % WindowSize].getSeqnum() == (lastRcvSeqNum + 1)) {
-            toLayer5(receiverWindow[(lastRcvSeqNum + 1) % WindowSize].getPayload());
-            toLayer3(B, receiverWindow[(lastRcvSeqNum + 1) % WindowSize]);
-            lastRcvPacket = receiverWindow[(lastRcvSeqNum + 1) % WindowSize];
+            expectedSeqNum = (expectedSeqNum + 1) % LimitSeqNo;
+            toLayer5(packet.getPayload());
             ackedPackets++;
             deliveredPackets++;
-            lastRcvSeqNum++;
+            lastRcvPacket = packet;
+            receiverWindow[packet.getSeqnum() % WindowSize] = null;
+
+            // Check buffer for in order packets
+            while (receiverWindow[expectedSeqNum % WindowSize] != null && receiverWindow[expectedSeqNum].getSeqnum() == expectedSeqNum) {
+              expectedSeqNum = (expectedSeqNum + 1) % LimitSeqNo;
+              toLayer5(packet.getPayload());
+              ackedPackets++;
+              deliveredPackets++;
+              lastRcvPacket = packet;
+            }
+
+            if (expectedSeqNum > 0) {
+              toLayer3(B, lastRcvPacket);
+            }
+
+          // If packet in window from future
+          } else {
+            receiverWindow[packet.getSeqnum() % WindowSize] = packet;
+            if (expectedSeqNum > 0) {
+              toLayer3(B, lastRcvPacket);
+              ackedPackets++;
+            }
           }
-
-        // If packet is duplicate, send duplicate ack
-        } else if (packet.getSeqnum() == lastRcvSeqNum) {
-          toLayer3(B, lastRcvPacket);
-          ackedPackets++;
-
-        // If packet is not next but in window, buffer
-        } else if (packet.getSeqnum() > (lastRcvSeqNum + 1) && packet.getSeqnum() < (lastRcvSeqNum + WindowSize)) {
-          receiverWindow[packet.getSeqnum() % WindowSize] = packet;
-          toLayer3(B, lastRcvPacket);
-          ackedPackets++;
-
-        // Drop all other packets
+        // If packet not in window
         } else {
-          //System.out.println("B Input: Dropped for out of window");
+          if (expectedSeqNum > 0) {
+            toLayer3(B, lastRcvPacket);
+            ackedPackets++;
+          }
         }
       } else {
         System.out.println("B Input: Received Corrupted Packet");
