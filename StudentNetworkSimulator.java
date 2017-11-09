@@ -164,12 +164,9 @@ public class StudentNetworkSimulator extends NetworkSimulator {
       aPacket.setChecksum(checksum(aPacket));
       senderBuffer.add(aPacket);
 
-
-      System.out.printf("OUT LOOP: sendHead: %d, CurSeqNo: %d\n", sendHead, CurSeqNo);
       // Add from buffer into window where space allows
-      for (int i = sendHead; i < sendHead + WindowSize && i < senderBuffer.size(); i++) {
-        System.out.printf("IN LOOP: sendHead: %d, i: %d, CurSeqNo: %d\n", sendHead, i, CurSeqNo);
-        if (isInWindow(sendHead, i) && senderWindow[i % WindowSize] == null) {
+      for (int i = sendHead; i < sendHead + WindowSize; i++) {
+        if (isInWindow(sendHead, i) && senderWindow[i % WindowSize] == null && !senderBuffer.isEmpty()) {
           ackStatus[i % WindowSize] = -1;
           senderWindow[i % WindowSize] = senderBuffer.poll();
         }
@@ -201,7 +198,6 @@ public class StudentNetworkSimulator extends NetworkSimulator {
 
         // Check if ack is in window
         if (isInWindow(sendHead, packet.getAcknum())) {
-          System.out.println("Received ack for: " + packet.getAcknum());
           // Check if at head
           if (packet.getAcknum() == sendHead) {
             ackStatus[sendHead] = -1;
@@ -305,12 +301,14 @@ public class StudentNetworkSimulator extends NetworkSimulator {
               expectedSeqNum = (expectedSeqNum + 1) % LimitSeqNo;
               toLayer5(packet.getPayload());
               ackedPackets++;
+              System.out.println("ACK FROM B 0");
               deliveredPackets++;
               lastRcvPacket = packet;
             }
 
             if (expectedSeqNum > 0) {
               toLayer3(B, lastRcvPacket);
+              System.out.println("ACK FROM B 1");
             }
 
           // If packet in window from future
@@ -318,6 +316,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
             receiverWindow[packet.getSeqnum() % WindowSize] = packet;
             if (expectedSeqNum > 0) {
               toLayer3(B, lastRcvPacket);
+              System.out.println("ACK FROM B 2");
               ackedPackets++;
             }
           }
@@ -325,6 +324,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         } else {
           if (expectedSeqNum > 0) {
             toLayer3(B, lastRcvPacket);
+            System.out.println("ACK FROM B 3");
             ackedPackets++;
           }
         }
