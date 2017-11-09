@@ -102,15 +102,18 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     private int SenderHead = 0;
     private int[] ackStatus; // seq num as index, 0 or 1 for unack/ack
     private Packet[] senderPackets; // seq num as index
-    private Queue<Packet> senderBuffer = new LinkedList<Packet>();
-    private Queue<Packet> senderWindow = new LinkedList<Packet>();
-    private Queue<Integer> acks = new LinkedList<Integer>();
+    private LinkedList<Packet> senderBuffer = new LinkedList<Packet>();
+    private LinkedList<Packet> senderWindow = new LinkedList<Packet>();
+    private LinkedList<Integer> acks = new LinkedList<Integer>();
     private int head = 0;
     private int tail = 0;
+    private int lastAck = 0;
+    private int winSize = 0;
 
     // B
     private int lastRcvSeqNum = -1;
     private Packet[] receiverPackets;
+    private LinkedList<Packet> receiverBuffer = new LinkedList<Packet>();
 
     // Statistics
     private int originalTransmissions = 0;
@@ -157,36 +160,9 @@ public class StudentNetworkSimulator extends NetworkSimulator {
       senderBuffer.add(aPacket);
       CurSeqNo = (CurSeqNo + 1) % WindowSize;
 
-      /*while ((WindowSize - head + tail) < (WindowSize - 1)) {
-        senderPackets[CurSeqNo] = senderBuffer.poll();
-        CurSeqNo = (CurSeqNo + 1) % WindowSize;
-        tail = (tail + 1) % WindowSize;
-        System.out.println("Head: " + head + ", tail: " + tail + ", cur: " + CurSeqNo);
-      }*/
-
-      while (senderWindow.size() < WindowSize && !senderBuffer.isEmpty()) {
-        senderWindow.add(senderBuffer.poll());
-        acks.add(Integer(-1));
-      }
-
-
-      //System.out.println("####################");
-
-      /*for (int i = 0; i < WindowSize; i++) {
-        System.out.println("Head: " + head + ", tail: " + tail + ", ackStatus: " + ackStatus[i]);
-        if (i >= head && i < tail && senderPackets[i] != null && ackStatus[i] == -1) {
-          System.out.println("Sending: " + i);
-          toLayer3(A, senderPackets[i]);
-          ackStatus[i] = 0;
-          originalTransmissions++;
-          stopTimer(A);
-          startTimer(A, RxmtInterval);
-        }
-      }*/
-
-      for (int i = 0; i < senderWindow.size(); i++) {
+      while (winSize <= WindowSize) {
         toLayer3(A, senderWindow.get(i));
-        acks.set(i, 0);
+        winSize++;
         originalTransmissions++;
         stopTimer(A);
         startTimer(A, RxmtInterval);
@@ -201,29 +177,31 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     // sent from the B-side.
     protected void aInput(Packet packet) {
       System.out.println("A Input: Begin");
-
+      System.out.println(packet);
+      System.out.println("Window size: " + senderWindow.size() + ", acks size: " + acks.size());
       if (packet.getChecksum() == checksum(packet)) {
-        int idx = senderWindow.indexOf(packet);
-        if (acks.get(idx) == 1) {
+        int idx = packet.getAcknum(); //senderWindow.indexOf(packet);
+        if (packet.getAcknum() == lastAck && !senderWindow.isEmpty()) {
           stopTimer(A);
           startTimer(A, RxmtInterval);
           toLayer3(A, senderWindow.peek());
           retransmissions++;
-        } else if (packet.getAcknum() >= senderWindow.peek().getAcknum()) {
+        } else if (!senderWindow.isEmpty() && packet.getAcknum() >= senderWindow.peek().getAcknum()) {
+          lastAck = packet.getAcknum();
           stopTimer(A);
           int diff = packet.getAcknum() - senderWindow.peek().getAcknum();
           for (int i = 0; i < diff; i++) {
             senderWindow.poll();
             acks.poll();
           }
-          for (int i = 0; i < WindowSize; i++) {
-            if (i >= head && i < tail && senderPackets[i] != null && ackStatus[i] == -1) {
-              toLayer3(A, senderPackets[i]);
-              ackStatus[i] = 0;
+          for (int i = 0; i < senderWindow.size(); i++) {
+            if (senderWindow.get(i).getSeqnum() > lastAck) {
+              toLayer3(A, senderWindow.get(i));
+              acks.set(i, 0);
               originalTransmissions++;
               stopTimer(A);
               startTimer(A, RxmtInterval);
-            }
+            } 
           }
         }
       } else {
@@ -241,15 +219,14 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     protected void aTimerInterrupt() {
       System.out.println("A Timer Interrupt: Begin");
 
-      for (int i = 0; i < WindowSize; i++) {
-        if ((i >= SenderHead && i <= ((SenderHead + WindowSize) % LimitSeqNo)) && senderPackets[i] != null && ackStatus[i] == 0) {
-          toLayer3(A, senderPackets[i]);
-          System.out.println("Restransmitting Packet:");
-          System.out.println(senderPackets[i]);
+      for (int i = 0; i < senderWindow.size(); i++) {
+        if (senderWindow.get(i).getSeqnum() > lastAck) {
+          toLayer3(A, senderWindow.get(i));
+          acks.set(i, 0);
           retransmissions++;
           stopTimer(A);
           startTimer(A, RxmtInterval);
-        }
+        } 
       }
 
       System.out.println("A Timer Interrupt: End");
@@ -273,11 +250,9 @@ public class StudentNetworkSimulator extends NetworkSimulator {
       System.out.println("B Input: Begin");
 
       if (packet.getChecksum() == checksum(packet)) {
-        System.out.println("Received packet");
         packet.setAcknum(packet.getSeqnum());
         packet.setChecksum(checksum(packet));
-        receiverPackets[packet.getSeqnum()] = packet;
-        if (packet.getSeqnum() == (lastRcvSeqNum + 1)) {
+        if (packet.getSeqnum() == (lastRcvSeqNum + 1) % WindowSize) {
           toLayer5(packet.getPayload());
           toLayer3(B, packet);
           ackedPackets++;
