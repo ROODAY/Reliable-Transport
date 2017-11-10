@@ -144,6 +144,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
 
     private boolean isInWindow(int start, int seqno) {
       for (int i = 0; i < WindowSize; i++) {
+        //System.out.printf("comparing %d to %d\n", (start % LimitSeqNo), seqno);
         if (start % LimitSeqNo == seqno) {
           return true;
         } else {
@@ -175,6 +176,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
       // For every packet in window, check if unsent. If so, send 
       for (int i = 0; i < ackStatus.length; i ++) {
         if (senderWindow[i] != null && ackStatus[i] == -1) {
+          System.out.println("Sending Packet: " + senderWindow[i]);
           ackStatus[i] = 0;
           toLayer3(A, senderWindow[i]);
           originalTransmissions++;
@@ -183,6 +185,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         }
       }
       CurSeqNo = (CurSeqNo + 1) % LimitSeqNo;
+      System.out.println("##################### CurSeqNo: " + CurSeqNo);
 
       //System.out.println("A Output: End");
     }
@@ -195,6 +198,8 @@ public class StudentNetworkSimulator extends NetworkSimulator {
       // Check if packet is corrupt
       if (packet.getChecksum() == checksum(packet)) {
         stopTimer(A);
+
+        System.out.println("########### Received ack for " + packet.getSeqnum());
 
         // Check if ack is in window
         if (isInWindow(sendHead, packet.getAcknum())) {
@@ -253,11 +258,12 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     // for how the timer is started and stopped. 
     protected void aTimerInterrupt() {
       //System.out.println("A Timer Interrupt: Begin");
-
+      if (ackStatus[sendHead] < 1) {
       toLayer3(A, senderWindow[sendHead]);
       retransmissions++;
       stopTimer(A);
       startTimer(A, RxmtInterval);
+      }
 
       //System.out.println("A Timer Interrupt: End");
     }
@@ -280,6 +286,8 @@ public class StudentNetworkSimulator extends NetworkSimulator {
       //System.out.println("B Input: Begin");
 
       if (packet.getChecksum() == checksum(packet)) {
+
+            System.out.println("expectedSeqNum: " + expectedSeqNum);
         // Set ack num and recompute checksum
         packet.setAcknum(packet.getSeqnum());
         packet.setChecksum(checksum(packet));
@@ -325,6 +333,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
           if (expectedSeqNum > 0) {
             toLayer3(B, lastRcvPacket);
             System.out.println("ACK FROM B 3");
+            System.out.printf("expected: %d, got: %d\n", expectedSeqNum, packet.getSeqnum());
             ackedPackets++;
           }
         }
