@@ -155,8 +155,6 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     // the data in such a message is delivered in-order, and correctly, to
     // the receiving upper layer.
     protected void aOutput(Message message) {
-      //System.out.println("A Ouput: Begin");
-
       // Create and buffer packet
       Packet aPacket = new Packet(CurSeqNo, -1, 0, message.getData());
       aPacket.setChecksum(checksum(aPacket));
@@ -182,8 +180,6 @@ public class StudentNetworkSimulator extends NetworkSimulator {
           startTimer(A, RxmtInterval);
         }
       }
-
-      //System.out.println("A Output: End");
     }
     
     // This routine will be called whenever a packet sent from the B-side 
@@ -248,12 +244,8 @@ public class StudentNetworkSimulator extends NetworkSimulator {
           startTimer(A, RxmtInterval);
         }
       } else {
-        System.out.println("A Input: Received Corrupted Packet");
-        System.out.println(packet);
         corruptedPackets++;
       }
-
-      //System.out.println("A Input: End");
     }
     
     // This routine will be called when A's timer expires (thus generating a 
@@ -261,8 +253,6 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     // the retransmission of packets. See startTimer() and stopTimer(), above,
     // for how the timer is started and stopped. 
     protected void aTimerInterrupt() {
-      //System.out.println("A Timer Interrupt: Begin");
-
       for (int i = sendHead; i < sendHead + WindowSize; i++) {
         if (ackStatus[i % WindowSize] == 0) {
           toLayer3(A, senderWindow[i % WindowSize]);
@@ -272,8 +262,6 @@ public class StudentNetworkSimulator extends NetworkSimulator {
           startTimer(A, RxmtInterval);
         } 
       }
-
-      //System.out.println("A Timer Interrupt: End");
     }
     
     // This routine will be called once, before any of your other A-side 
@@ -291,8 +279,6 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     // arrives at the B-side.  "packet" is the (possibly corrupted) packet
     // sent from the A-side.
     protected void bInput(Packet packet) {
-      //System.out.println("B Input: Begin");
-
       if (packet.getChecksum() == checksum(packet)) {
         // Set ack num and recompute checksum
         packet.setAcknum(packet.getSeqnum());
@@ -327,18 +313,10 @@ public class StudentNetworkSimulator extends NetworkSimulator {
           receiverWindow[packet.getSeqnum() % WindowSize] = packet;
           toLayer3(B, lastRcvPacket);
           ackedPackets++;
-
-        // Drop all other packets
-        } else {
-          //System.out.println("B Input: Dropped for out of window");
         }
       } else {
-        System.out.println("B Input: Received Corrupted Packet");
-        System.out.println(packet);
         corruptedPackets++;
       }
-
-      //System.out.println("B Input: End");
     }
     
     // This routine will be called once, before any of your other B-side 
@@ -368,11 +346,6 @@ public class StudentNetworkSimulator extends NetworkSimulator {
       System.out.println("Average RTT: " + (rttSum/ (double) rttCount));
       System.out.println("Average communication time: " + (commSum/ (double) commCount));
       System.out.println("==================================================");
-
-      // PRINT YOUR OWN STATISTIC HERE TO CHECK THE CORRECTNESS OF YOUR PROGRAM
-      System.out.println("\nEXTRA:");
-      // EXAMPLE GIVEN BELOW
-      //System.out.println("Example statistic you want to check e.g. number of ACK packets received by A :" + "<YourVariableHere>"); 
     } 
 
 }
