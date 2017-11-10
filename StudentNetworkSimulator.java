@@ -253,15 +253,11 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     // the retransmission of packets. See startTimer() and stopTimer(), above,
     // for how the timer is started and stopped. 
     protected void aTimerInterrupt() {
-      for (int i = sendHead; i < sendHead + WindowSize; i++) {
-        if (ackStatus[i % WindowSize] == 0) {
-          toLayer3(A, senderWindow[i % WindowSize]);
-          rttMap.put(senderWindow[i % WindowSize].getSeqnum(), getTime());
-          retransmissions++;
-          stopTimer(A);
-          startTimer(A, RxmtInterval);
-        } 
-      }
+      toLayer3(A, senderWindow[sendHead % WindowSize]);
+      rttMap.put(senderWindow[sendHead % WindowSize].getSeqnum(), getTime());
+      retransmissions++;
+      stopTimer(A);
+      startTimer(A, RxmtInterval);
     }
     
     // This routine will be called once, before any of your other A-side 
