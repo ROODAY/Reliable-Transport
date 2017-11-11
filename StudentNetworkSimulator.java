@@ -296,7 +296,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         // If packet is expected seq num, send data up to layer 5
         if (packet.getSeqnum() == (lastRcvSeqNum + 1)) {
           toLayer5(packet.getPayload());
-          toLayer3(B, packet);
+          //toLayer3(B, packet);
           ackedPackets++;
           deliveredPackets++;
           lastRcvSeqNum++;
@@ -305,20 +305,25 @@ public class StudentNetworkSimulator extends NetworkSimulator {
           // Check buffer for more packets
           while (receiverWindow[(lastRcvSeqNum + 1) % WindowSize] != null && receiverWindow[(lastRcvSeqNum + 1) % WindowSize].getSeqnum() == (lastRcvSeqNum + 1)) {
             toLayer5(receiverWindow[(lastRcvSeqNum + 1) % WindowSize].getPayload());
-            toLayer3(B, receiverWindow[(lastRcvSeqNum + 1) % WindowSize]);
+            //toLayer3(B, receiverWindow[(lastRcvSeqNum + 1) % WindowSize]);
             lastRcvPacket = receiverWindow[(lastRcvSeqNum + 1) % WindowSize];
             ackedPackets++;
             deliveredPackets++;
             lastRcvSeqNum++;
           }
 
+
+          toLayer3(B, lastRcvPacket);
+
         // If packet is duplicate, send duplicate ack
         } else if (packet.getSeqnum() == lastRcvSeqNum) {
+          System.out.println("B Input: Sending Duplicate ACK: " + lastRcvPacket.getSeqnum());
           toLayer3(B, lastRcvPacket);
           ackedPackets++;
 
         // If packet is not next but in window, buffer
         } else if (packet.getSeqnum() > (lastRcvSeqNum + 1) && packet.getSeqnum() < (lastRcvSeqNum + WindowSize)) {
+          System.out.println("B Input: Sending Duplicate ACK: " + lastRcvPacket.getSeqnum());
           receiverWindow[packet.getSeqnum() % WindowSize] = packet;
           toLayer3(B, lastRcvPacket);
           ackedPackets++;
