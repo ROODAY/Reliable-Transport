@@ -65,6 +65,9 @@ Seed must be a value greater than 0.
 To view statistical figures on the relationship between communication time 
 and loss/corruption probability, view `Communication Time Figures.xlsx`.
 
+To view statistics on the relationship between goodput/throughput/packet delay
+and loss/corruption probability, view `Goodput and Throughput Stats.xlsx`.
+
 ## Extensions and Tradeoffs
 
 Currently, the protocol using infinitely growing sequence numbers for the packets.

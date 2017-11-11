@@ -91,6 +91,8 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     private int WindowSize;
     private double RxmtInterval;
     private int LimitSeqNo;
+
+    private double startTime;
     
     // Add any necessary class variables here.  Remember, you cannot use
     // these variables to send messages error free!  They can only hold
@@ -138,6 +140,7 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         WindowSize = winsize;
         LimitSeqNo = winsize*2; // set appropriately; assumes SR here!
         RxmtInterval = delay;
+        startTime = getTime();
     }
 
     private int checksum(Packet packet) {
@@ -369,7 +372,9 @@ public class StudentNetworkSimulator extends NetworkSimulator {
       System.out.println("Ratio of corrupted packets: " + corruptionRatio);
       System.out.println("Average RTT: " + (rttSum/ (double) rttCount));
       System.out.println("Average communication time: " + (commSum/ (double) commCount));
-      System.out.println("==================================================");
+      System.out.println("==================================================\n\n");
+      System.out.println("Throughput (packets/sec): " + ((originalTransmissions + retransmissions) / ((getTime() - startTime) / 1000)));
+      System.out.println("Goodput (packets/sec): " + (deliveredPackets / ((getTime() - startTime) / 1000)));
     } 
 
 }
