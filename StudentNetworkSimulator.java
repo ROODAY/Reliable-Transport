@@ -246,11 +246,15 @@ public class StudentNetworkSimulator extends NetworkSimulator {
         // If duplicate ack, resend next packet
         } else if (ackStatus[packet.getAcknum() % WindowSize] == 1) {
           System.out.printf("A Input: Received Duplicate ACK %d | Retransmitting %d\n", packet.getAcknum(), sendHead);
-          toLayer3(A, senderWindow[(packet.getAcknum() + 1) % WindowSize]);
-          rttMap.put(senderWindow[(packet.getAcknum() + 1) % WindowSize].getSeqnum(), getTime());
-          retransmissions++;
-          stopTimer(A);
-          startTimer(A, RxmtInterval);
+          for (int i = sendHead; i < sendHead + WindowSize; i++) {
+            if (ackStatus[i % WindowSize] == 0) {
+              toLayer3(A, senderWindow[i % WindowSize]);
+              rttMap.put(senderWindow[i % WindowSize].getSeqnum(), getTime());
+              retransmissions++;
+              stopTimer(A);
+              startTimer(A, RxmtInterval);
+            } 
+          }
         }
       } else {
         System.out.println("A Input: Received Corrupted Packet");
@@ -265,11 +269,15 @@ public class StudentNetworkSimulator extends NetworkSimulator {
     // for how the timer is started and stopped. 
     protected void aTimerInterrupt() {
       System.out.println("A Timer Interrupt | Retransmitting " + sendHead);
-      toLayer3(A, senderWindow[sendHead % WindowSize]);
-      rttMap.put(senderWindow[sendHead % WindowSize].getSeqnum(), getTime());
-      retransmissions++;
-      stopTimer(A);
-      startTimer(A, RxmtInterval);
+      for (int i = sendHead; i < sendHead + WindowSize; i++) {
+        if (ackStatus[i % WindowSize] == 0) {
+          toLayer3(A, senderWindow[i % WindowSize]);
+          rttMap.put(senderWindow[i % WindowSize].getSeqnum(), getTime());
+          retransmissions++;
+          stopTimer(A);
+          startTimer(A, RxmtInterval);
+        } 
+      }
     }
     
     // This routine will be called once, before any of your other A-side 

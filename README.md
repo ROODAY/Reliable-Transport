@@ -2,7 +2,7 @@
 
 ## Design
 
-This protocol implements Selective Repeat with Cumulative ACKs,
+This protocol implements Go Back N with Cumulative ACKs and SACK,
 utilizing a static retransmission timer (timeout length is defined
 as an argument when running the program).
 
